@@ -41,6 +41,8 @@ import java.net.Proxy;
 import java.net.Socket;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import javafx.scene.web.WebView;
 
 /**
@@ -61,6 +63,10 @@ import javafx.scene.web.WebView;
  * <p>
  */
 public class TorLib {
+    
+    public static final String GET = "GET";
+    public static final String POST = "POST";
+    public final static String USER_AGENT = "Mozilla/5.0 (Windows NT 6.2; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/32.0.1667.0 Safari/537.36";
 
     /**
      * Default TOR Proxy port.
@@ -94,33 +100,72 @@ public class TorLib {
     private final int SOCKS4A_FAKEIP = (int) 0x01;
 
     private static final ArrayList openPorts = new ArrayList();
-
+    
     public static void clearHostobjects() {
         openPorts.clear();
     }
-
-    public String openTorConnection(String host, int targetPort, String url) {
-        StringBuffer b = new StringBuffer();
-        try {
-            if (host != null && !host.equals("")) {
+     
+    
+    public TorLib(String host, int targetPort)
+    {
+         if (host != null && !host.equals("")) {
                 this.proxyAddr = host;
             }
             if (targetPort > 0) {
                 this.proxyPort = targetPort;
             }
+    }
+    
+    /**
+     * @param host - proxyHost usually 127.0.0.1
+     * @parma targetPort proxy port this is the port where tor instance is running
+     *    you can have more than one Tor instance running on different ports so 
+     *   connect with desire one
+     * @param connectionType one of GET or POST
+     * @param url - address
+     * @param headerSetings this is a header parameters if any or empty map
+     *      "Cookies","Value" or "User-Agent", USER_AGENT
+     */
+    public String openTorConnection( String url,HashMap headerSettings,String connectionType) {
+        StringBuffer b = new StringBuffer();
+        try {
+            
+            if (connectionType == null || connectionType.equals("")
+                     || (!connectionType.equals(GET) && !connectionType.equals(POST)))
+                connectionType = GET; // default one
             URL u = new URL(url);
             String targetHostname = u.getHost();
             String targetDir = u.getFile();//"index.html";
-            targetPort = 80;
+           int targetPort = 80;
 
             Socket s = TorSocket(targetHostname, targetPort);
             DataInputStream is = new DataInputStream(s.getInputStream());
             PrintStream out = new java.io.PrintStream(s.getOutputStream());
 
             //Construct an HTTP request
-            out.print("GET  /" + targetDir + " HTTP/1.0\r\n");
+            String userAgent = (String)headerSettings.get("User-Agent");
+            if (userAgent != null && !userAgent.equals(""))
+            {
+                headerSettings.remove("User-Agent");
+            }else
+            {
+                userAgent = USER_AGENT; 
+                         
+            }
+            out.print(connectionType + "  /" + targetDir + " HTTP/1.0\r\n");
             out.print("Host: " + targetHostname + ":" + targetPort + "\r\n");
+            out.print("User-Agent:" + userAgent + "\r\n");
             out.print("Accept: */*\r\n");
+            if (headerSettings.keySet().size() > 0)
+            {
+                Iterator it = headerSettings.keySet().iterator();
+                while (it.hasNext())
+                {
+                    String key = (String)it.next();
+                    String value = (String)headerSettings.get(key);
+                    out.print(key + ":" + value +"\r\n");
+                }
+            }
             out.print("Connection: Keep-Alive\r\n");
             out.print("Pragma: no-cache\r\n");
             out.print("\r\n");
@@ -181,7 +226,7 @@ public class TorLib {
         String targetHostname = "how2seduce.blogspot.com";//"tor.eff.org";
         String targetDir = "/";//"index.html";
         int targetPort = 80;
-        TorLib torLib = new TorLib();
+        TorLib torLib = new TorLib(null,0);
         //WebView v = new WebView();
         //v.getEngine().setU
 
